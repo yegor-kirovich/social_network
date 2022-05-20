@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="/static/css/base.css">
+        <title>{{title}}</title>
+        <link href="static/icon/icon.png  " rel="shortcut icon">
+    </head>
+    <body>
+    <header>
+        <nav class="navbar">
+            <p>
+                <button class="btn btn-primary" onClick='location.href="http://127.0.0.1:5000/"'>Прогноз на 10 дней</button>
+                <button class="btn btn-primary" onClick='location.href="http://127.0.0.1:5000/basket"'>Прогноз на месец</button>
+            </p>
+        </nav>
+    </header>
+        <main role="main" class="container">
+            {% block content %}{% endblock %}
+        </main>
+    </body>
+</html>
