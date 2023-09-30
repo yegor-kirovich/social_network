@@ -1,9 +1,24 @@
 import sqlite3
+from data import db_session
+from data.user import User
 from flask import Flask, render_template, request, url_for, flash, redirect
 from werkzeug.exceptions import abort
+from flask_login import LoginManager
+from werkzeug.security import generate_password_hash
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your secret key'
+
+app.config['SECRET_KEY'] = 'secret-key-goes-here'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
+
+login_manager = LoginManager()
+login_manager.__init__(app)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    db_sess = db_session.create_session()
+    return db_sess.query(User).get(user_id)
 
 
 def get_db_connection():
@@ -14,7 +29,7 @@ def get_db_connection():
 
 def get_post(post_id):
     conn = get_db_connection()
-    post = conn.execute(f'SELECT * FROM posts WHERE id = {post_id}',).fetchone()
+    post = conn.execute(f'SELECT * FROM posts WHERE id = {post_id}').fetchone()
     conn.close()
     if post is None:
         abort(404)
@@ -87,5 +102,34 @@ def delete(id):
     return redirect(url_for('index'))
 
 
+@app.route('/signup', methods=('GET', 'POST'))
+def login():
+    return render_template('login.html')
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        name = request.form.get('name')
+        password = request.form.get('password')
+        password = generate_password_hash(password)
+
+        conn = get_db_connection()
+
+        user = conn.execute('SELECT * FROM users WHERE email = ?', (email,))
+
+        if user.fetchone():
+            return redirect(url_for('login'))
+
+        conn.execute('INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
+                     (email, password, name))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('login'))
+
+    return render_template('register.html')
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=1)
