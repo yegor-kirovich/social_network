@@ -3,8 +3,9 @@ from data import db_session
 from data.user import User
 from flask import Flask, render_template, request, url_for, flash, redirect
 from werkzeug.exceptions import abort
-from flask_login import LoginManager
-from werkzeug.security import generate_password_hash
+from flask_login import LoginManager, login_user, current_user
+
+db_session.global_init("database.db")
 
 app = Flask(__name__)
 
@@ -102,33 +103,57 @@ def delete(id):
     return redirect(url_for('index'))
 
 
-@app.route('/signup', methods=('GET', 'POST'))
+@app.route('/login', methods=('GET', 'POST'))
 def login():
+    if request.method == 'POST':
+        db_sess = db_session.create_session()
+        user = db_sess.query(User).filter(User.email == request.form.get('email')).first()
+        remember = request.form.get('remember')
+        if user and user.check_password(request.form.get('password')):
+            if remember == "on":
+                remember = True
+            else:
+                remember = False
+            login_user(user, remember=remember)
+            return redirect('/profile')
+
     return render_template('login.html')
 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        db_sess = db_session.create_session()
+
         email = request.form.get('email')
         name = request.form.get('name')
         password = request.form.get('password')
-        password = generate_password_hash(password)
+        again_password = request.form.get('again_password')
 
-        conn = get_db_connection()
+        if password != again_password:
+            flash("Пароль повторен не правильно")
+            return render_template('register.html')
 
-        user = conn.execute('SELECT * FROM users WHERE email = ?', (email,))
+        if db_sess.query(User).filter(User.email == email).first():
+            flash("Такой пользователь уже есть")
+            return render_template('register.html')
 
-        if user.fetchone():
-            return redirect(url_for('login'))
-
-        conn.execute('INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
-                     (email, password, name))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('login'))
+        user = User(
+            name=name,
+            email=email
+        )
+        user.set_password(password)
+        db_sess.add(user)
+        db_sess.commit()
+        return redirect('/login')
 
     return render_template('register.html')
+
+
+@app.route('/profile')
+def profile():
+    if current_user.is_authenticated:
+        return render_template("profile.html", name=current_user.name)
 
 
 if __name__ == '__main__':
