@@ -1,11 +1,11 @@
 import sqlite3
 from data import db_session
-from data.user import User
+from data.user import User, Post
 from flask import Flask, render_template, request, url_for, flash, redirect
 from werkzeug.exceptions import abort
 from flask_login import LoginManager, login_user, current_user, logout_user
 
-db_session.global_init("database.db")
+db_session.global_init("data/database.db")
 
 app = Flask(__name__)
 
@@ -23,7 +23,7 @@ def load_user(user_id):
 
 
 def get_db_connection():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('data/database.db')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -54,17 +54,22 @@ def post(post_id):
 @app.route('/create', methods=('GET', 'POST'))
 def create():
     if request.method == 'POST':
+
         title = request.form['title']
         content = request.form['content']
+        owner_id = current_user.id
 
         if not title:
             flash('Title is required!')
         else:
-            conn = get_db_connection()
-            conn.execute('INSERT INTO posts (title, content) VALUES (?, ?)',
-                         (title, content))
-            conn.commit()
-            conn.close()
+            db_sess = db_session.create_session()
+            post = Post(
+                title=title,
+                content=content,
+                post_owner=owner_id
+            )
+            db_sess.add(post)
+            db_sess.commit()
             return redirect(url_for('index'))
 
     return render_template('create.html', cur=current_user)
@@ -152,7 +157,9 @@ def register():
 
 @app.route('/profile')
 def profile():
-    return render_template("profile.html", cur=current_user)
+    db_sess = db_session.create_session()
+    post = db_sess.query(Post).filter(Post.post_owner == current_user.id)
+    return render_template("profile.html", cur=current_user, posts=post)
 
 
 @app.route('/logout')
